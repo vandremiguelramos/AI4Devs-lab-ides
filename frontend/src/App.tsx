@@ -1,25 +1,15 @@
 import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import { ChakraProvider, Box, Heading } from '@chakra-ui/react';
+import CandidateForm from './components/candidates/CandidateForm';
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <ChakraProvider>
+      <Box p={8}>
+        <Heading mb={6}>ATS System - Add Candidate</Heading>
+        <CandidateForm />
+      </Box>
+    </ChakraProvider>
   );
 }
 
