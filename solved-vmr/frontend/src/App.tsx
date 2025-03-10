@@ -1,7 +1,6 @@
 import React from 'react';
 import { ChakraProvider, ColorModeScript } from '@chakra-ui/react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { HelmetProvider } from 'react-helmet-async';
 import Dashboard from './components/Dashboard';
 import CandidateForm from './components/candidates/CandidateForm';
 import CandidateList from './components/candidates/CandidateList';
@@ -9,7 +8,7 @@ import theme from './theme';
 
 function App() {
   return (
-    <HelmetProvider>
+    <>
       <ColorModeScript initialColorMode={theme.config.initialColorMode} />
       <ChakraProvider theme={theme}>
         <Router>
@@ -21,8 +20,8 @@ function App() {
           </Routes>
         </Router>
       </ChakraProvider>
-    </HelmetProvider>
+    </>
   );
 }
 
-export default App; 
+export default App;

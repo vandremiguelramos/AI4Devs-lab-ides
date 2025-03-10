@@ -97,4 +97,18 @@ export const createCandidate = async (req: Request, res: Response) => {
     console.error('Error creating candidate:', error);
     res.status(500).json({ error: 'Failed to create candidate' });
   }
+};
+
+export const getAllCandidates = async (_req: Request, res: Response) => {
+  try {
+    const candidates = await prisma.candidate.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+    res.json(candidates);
+  } catch (error) {
+    console.error('Error fetching candidates:', error);
+    res.status(500).json({ error: 'Failed to fetch candidates' });
+  }
 }; 

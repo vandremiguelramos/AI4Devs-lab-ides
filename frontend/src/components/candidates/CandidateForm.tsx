@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import {
   Box,
   Button,
+  Container,
   Input,
   Stack,
   Textarea,
@@ -20,6 +22,12 @@ import {
   AlertTitle,
   AlertDescription,
   CloseButton,
+  Heading,
+  Select,
+  InputGroup,
+  Center,
+  Icon,
+  useColorModeValue,
 } from '@chakra-ui/react';
 import {
   FormControl,
@@ -27,9 +35,11 @@ import {
   FormErrorMessage,
 } from '@chakra-ui/form-control';
 import { createStandaloneToast } from '@chakra-ui/toast';
-import { CheckCircleIcon, WarningIcon } from '@chakra-ui/icons';
-
-const { toast } = createStandaloneToast();
+import { CheckCircleIcon, WarningIcon, ChevronLeftIcon, AttachmentIcon } from '@chakra-ui/icons';
+import { useNavigate } from 'react-router-dom';
+import { Education, EDUCATION_OPTIONS, ErrorState } from '../../types/candidate';
+import { Helmet } from 'react-helmet-async';
+import PageLayout from '../layout/PageLayout';
 
 interface CandidateFormData {
   firstName: string;
@@ -37,15 +47,9 @@ interface CandidateFormData {
   email: string;
   phoneNumber: string;
   address: string;
-  education: string;
+  education: Education;
   workExperience: string;
   cv?: FileList;
-}
-
-interface ErrorState {
-  title: string;
-  message: string;
-  type: 'server' | 'validation' | 'network' | 'unknown';
 }
 
 const CandidateForm: React.FC = () => {
@@ -54,67 +58,28 @@ const CandidateForm: React.FC = () => {
     handleSubmit,
     formState: { errors },
     reset,
+    watch,
   } = useForm<CandidateFormData>();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [addedCandidate, setAddedCandidate] = useState<any>(null);
+  const [addedCandidate, setAddedCandidate] = useState<CandidateFormData | null>(null);
   const { isOpen: isSuccessOpen, onOpen: onSuccessOpen, onClose: onSuccessClose } = useDisclosure();
   const { isOpen: isErrorOpen, onOpen: onErrorOpen, onClose: onErrorClose } = useDisclosure();
   const [error, setError] = useState<ErrorState | null>(null);
+  const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const selectedFile = watch('cv')?.[0];
 
-  const handleModalClose = () => {
-    onSuccessClose();
-    reset();
-  };
-
-  const getErrorDetails = (error: any): ErrorState => {
-    if (!navigator.onLine) {
-      return {
-        title: 'Network Error',
-        message: 'Please check your internet connection and try again.',
-        type: 'network'
-      };
-    }
-
-    if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-      return {
-        title: 'Server Connection Error',
-        message: 'Unable to connect to the server. Please try again later or contact support if the problem persists.',
-        type: 'server'
-      };
-    }
-
-    if (error.message?.includes('already exists')) {
-      return {
-        title: 'Validation Error',
-        message: error.message,
-        type: 'validation'
-      };
-    }
-
-    return {
-      title: 'Unexpected Error',
-      message: 'An unexpected error occurred. Please try again or contact support if the problem persists.',
-      type: 'unknown'
-    };
-  };
-
-  const onSubmit = async (data: CandidateFormData) => {
+  const onSubmit: SubmitHandler<CandidateFormData> = async (data) => {
     try {
       setIsSubmitting(true);
       const formData = new FormData();
       Object.entries(data).forEach(([key, value]) => {
         if (key === 'cv' && data.cv?.[0]) {
           formData.append('cv', data.cv[0]);
-        } else {
-          formData.append(key, value);
+        } else if (value !== undefined) {
+          formData.append(key, String(value));
         }
-      });
-
-      console.log('Submitting form data:', {
-        firstName: formData.get('firstName'),
-        lastName: formData.get('lastName'),
-        email: formData.get('email'),
-        cv: formData.get('cv'),
       });
 
       const response = await fetch('http://localhost:3010/api/candidates', {
@@ -125,46 +90,20 @@ const CandidateForm: React.FC = () => {
         body: formData,
       });
 
-      console.log('Response status:', response.status);
-      const responseText = await response.text();
-      console.log('Response text:', responseText);
-
       if (!response.ok) {
-        let errorMessage = 'Failed to create candidate';
-        try {
-          const errorData = JSON.parse(responseText);
-          errorMessage = errorData.error || errorMessage;
-        } catch (e) {
-          console.error('Error parsing error response:', e);
-        }
-        throw new Error(errorMessage);
+        throw new Error('Failed to create candidate');
       }
 
-      const result = JSON.parse(responseText);
-      console.log('Success:', result);
+      const result = await response.json();
       setAddedCandidate(result);
-      
-      toast({
-        title: 'Success',
-        description: 'Candidate added successfully',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      });
-
       onSuccessOpen();
+      reset();
     } catch (error: any) {
-      console.error('Error details:', error);
-      const errorDetails = getErrorDetails(error);
-      setError(errorDetails);
       onErrorOpen();
-      
-      toast({
-        title: errorDetails.title,
-        description: errorDetails.message,
-        status: 'error',
-        duration: 7000,
-        isClosable: true,
+      setError({
+        title: 'Error',
+        message: error.message || 'Failed to create candidate',
+        type: 'error'
       });
     } finally {
       setIsSubmitting(false);
@@ -172,29 +111,51 @@ const CandidateForm: React.FC = () => {
   };
 
   return (
-    <>
-      <Box maxW="600px" mx="auto" mt={8} p={6} borderWidth={1} borderRadius="lg">
+    <PageLayout>
+      <Helmet>
+        <title>ATS Dashboard - Add Candidate</title>
+      </Helmet>
+      <Box>
+        <Button
+          leftIcon={<ChevronLeftIcon />}
+          mb={6}
+          onClick={() => navigate(-1)}
+          variant="ghost"
+        >
+          Back
+        </Button>
+        <Heading size="lg" mb={6} color={useColorModeValue('gray.800', 'white')}>
+          Add New Candidate
+        </Heading>
         <form onSubmit={handleSubmit(onSubmit)}>
-          <Stack gap={4}>
-            <FormControl isInvalid={!!errors.firstName}>
-              <FormLabel>First Name</FormLabel>
-              <Input
-                {...register('firstName', { required: 'First name is required' })}
-              />
-              <FormErrorMessage>
-                {errors.firstName && errors.firstName.message}
-              </FormErrorMessage>
-            </FormControl>
+          <VStack spacing={4} align="stretch">
+            <Stack direction={{ base: 'column', md: 'row' }} spacing={4}>
+              <FormControl isInvalid={!!errors.firstName}>
+                <FormLabel>First Name</FormLabel>
+                <Input
+                  {...register('firstName', {
+                    required: 'First name is required',
+                    minLength: { value: 2, message: 'Minimum length should be 2' }
+                  })}
+                />
+                <FormErrorMessage>
+                  {errors.firstName && errors.firstName.message}
+                </FormErrorMessage>
+              </FormControl>
 
-            <FormControl isInvalid={!!errors.lastName}>
-              <FormLabel>Last Name</FormLabel>
-              <Input
-                {...register('lastName', { required: 'Last name is required' })}
-              />
-              <FormErrorMessage>
-                {errors.lastName && errors.lastName.message}
-              </FormErrorMessage>
-            </FormControl>
+              <FormControl isInvalid={!!errors.lastName}>
+                <FormLabel>Last Name</FormLabel>
+                <Input
+                  {...register('lastName', {
+                    required: 'Last name is required',
+                    minLength: { value: 2, message: 'Minimum length should be 2' }
+                  })}
+                />
+                <FormErrorMessage>
+                  {errors.lastName && errors.lastName.message}
+                </FormErrorMessage>
+              </FormControl>
+            </Stack>
 
             <FormControl isInvalid={!!errors.email}>
               <FormLabel>Email</FormLabel>
@@ -204,8 +165,8 @@ const CandidateForm: React.FC = () => {
                   required: 'Email is required',
                   pattern: {
                     value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: 'Invalid email address',
-                  },
+                    message: 'Invalid email address'
+                  }
                 })}
               />
               <FormErrorMessage>
@@ -215,7 +176,15 @@ const CandidateForm: React.FC = () => {
 
             <FormControl isInvalid={!!errors.phoneNumber}>
               <FormLabel>Phone Number</FormLabel>
-              <Input {...register('phoneNumber')} />
+              <Input
+                {...register('phoneNumber', {
+                  required: 'Phone number is required',
+                  pattern: {
+                    value: /^\+?[\d\s-]+$/,
+                    message: 'Invalid phone number'
+                  }
+                })}
+              />
               <FormErrorMessage>
                 {errors.phoneNumber && errors.phoneNumber.message}
               </FormErrorMessage>
@@ -223,15 +192,30 @@ const CandidateForm: React.FC = () => {
 
             <FormControl isInvalid={!!errors.address}>
               <FormLabel>Address</FormLabel>
-              <Input {...register('address')} />
+              <Textarea
+                {...register('address', {
+                  required: 'Address is required'
+                })}
+              />
               <FormErrorMessage>
                 {errors.address && errors.address.message}
               </FormErrorMessage>
             </FormControl>
 
             <FormControl isInvalid={!!errors.education}>
-              <FormLabel>Education</FormLabel>
-              <Textarea {...register('education')} />
+              <FormLabel>Education Level</FormLabel>
+              <Select
+                {...register('education', {
+                  required: 'Education level is required'
+                })}
+              >
+                <option value="">Select education level</option>
+                {EDUCATION_OPTIONS.map((level) => (
+                  <option key={level} value={level}>
+                    {level.replace('_', ' ')}
+                  </option>
+                ))}
+              </Select>
               <FormErrorMessage>
                 {errors.education && errors.education.message}
               </FormErrorMessage>
@@ -239,119 +223,117 @@ const CandidateForm: React.FC = () => {
 
             <FormControl isInvalid={!!errors.workExperience}>
               <FormLabel>Work Experience</FormLabel>
-              <Textarea {...register('workExperience')} />
+              <Textarea
+                {...register('workExperience', {
+                  required: 'Work experience is required',
+                  minLength: {
+                    value: 50,
+                    message: 'Please provide at least 50 characters'
+                  }
+                })}
+                placeholder="Describe your work experience..."
+                rows={4}
+              />
               <FormErrorMessage>
                 {errors.workExperience && errors.workExperience.message}
               </FormErrorMessage>
             </FormControl>
 
-            <FormControl>
-              <FormLabel>CV Upload</FormLabel>
+            <FormControl isInvalid={!!errors.cv}>
+              <FormLabel>CV/Resume</FormLabel>
               <Input
                 type="file"
-                accept=".pdf,.docx"
+                accept=".pdf,.doc,.docx"
                 {...register('cv')}
+                display="none"
+                ref={fileInputRef}
               />
+              <Button
+                leftIcon={<AttachmentIcon />}
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+              >
+                Upload CV
+              </Button>
+              {selectedFile && (
+                <Text mt={2} fontSize="sm">
+                  Selected file: {selectedFile.name}
+                </Text>
+              )}
+              <FormErrorMessage>
+                {errors.cv && errors.cv.message}
+              </FormErrorMessage>
             </FormControl>
 
             <Button
               type="submit"
               colorScheme="blue"
+              size="lg"
               isLoading={isSubmitting}
-              width="full"
+              loadingText="Submitting"
             >
-              Add Candidate
+              Submit
             </Button>
-          </Stack>
+          </VStack>
         </form>
       </Box>
 
-      <Modal isOpen={isSuccessOpen} onClose={handleModalClose} isCentered size="lg">
+      <Modal isOpen={isSuccessOpen} onClose={onSuccessClose}>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader display="flex" alignItems="center">
-            <CheckCircleIcon color="green.500" mr={2} />
-            Candidate Added Successfully
-          </ModalHeader>
+          <ModalHeader>Success</ModalHeader>
           <ModalBody>
-            <VStack align="stretch" spacing={3}>
-              <Text><strong>Name:</strong> {addedCandidate?.firstName} {addedCandidate?.lastName}</Text>
-              <Text><strong>Email:</strong> {addedCandidate?.email}</Text>
-              {addedCandidate?.phoneNumber && (
-                <Text><strong>Phone:</strong> {addedCandidate.phoneNumber}</Text>
-              )}
-              {addedCandidate?.cvUrl && (
-                <Text><strong>CV:</strong> Uploaded successfully</Text>
-              )}
-              <Text color="gray.600" fontSize="sm">
-                The candidate has been successfully added to the ATS system.
-              </Text>
-            </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <Button colorScheme="blue" onClick={handleModalClose}>
-              Add Another Candidate
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      <Modal isOpen={isErrorOpen} onClose={onErrorClose} isCentered size="lg">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader display="flex" alignItems="center">
-            <WarningIcon color="red.500" mr={2} />
-            {error?.title || 'Error'}
-          </ModalHeader>
-          <ModalBody>
-            <Alert
-              status="error"
-              variant="subtle"
-              flexDirection="column"
-              alignItems="center"
-              justifyContent="center"
-              textAlign="center"
-              borderRadius="md"
-              py={4}
-            >
-              <AlertIcon boxSize="6" mr={0} />
-              <AlertTitle mt={4} mb={1} fontSize="lg">
-                {error?.title}
-              </AlertTitle>
-              <AlertDescription maxWidth="sm">
-                {error?.message}
-                {error?.type === 'server' && (
-                  <Text mt={2} fontSize="sm">
-                    Error Code: SERVER_CONNECTION_ERROR
-                  </Text>
-                )}
-                {error?.type === 'network' && (
-                  <Text mt={2} fontSize="sm">
-                    Please check your network connection and try again.
-                  </Text>
-                )}
-              </AlertDescription>
+            <Alert status="success">
+              <AlertIcon />
+              <Box>
+                <AlertTitle>Candidate Added Successfully!</AlertTitle>
+                <AlertDescription>
+                  The candidate has been added to the system.
+                </AlertDescription>
+              </Box>
             </Alert>
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="red" mr={3} onClick={() => {
-              onErrorClose();
-              setError(null);
-            }}>
-              Close
+            <Button colorScheme="blue" mr={3} onClick={() => navigate('/candidates')}>
+              View Candidates
             </Button>
-            <Button variant="ghost" onClick={() => {
-              onErrorClose();
-              setError(null);
-              handleSubmit(onSubmit)();
-            }}>
-              Try Again
+            <Button variant="ghost" onClick={onSuccessClose}>
+              Add Another
             </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
-    </>
+
+      <Modal isOpen={isErrorOpen} onClose={onErrorClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Error</ModalHeader>
+          <ModalBody>
+            <Alert status="error">
+              <AlertIcon />
+              <Box>
+                <AlertTitle>{error?.title}</AlertTitle>
+                <AlertDescription>
+                  {error?.message}
+                </AlertDescription>
+              </Box>
+              <CloseButton
+                position="absolute"
+                right="8px"
+                top="8px"
+                onClick={onErrorClose}
+              />
+            </Alert>
+          </ModalBody>
+          <ModalFooter>
+            <Button colorScheme="blue" onClick={onErrorClose}>
+              Close
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    </PageLayout>
   );
 };
 
-export default CandidateForm;
+export default CandidateForm; 
