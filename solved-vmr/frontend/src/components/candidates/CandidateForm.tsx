@@ -38,6 +38,7 @@ import { CheckCircleIcon, WarningIcon, ChevronLeftIcon, AttachmentIcon } from '@
 import { useNavigate } from 'react-router-dom';
 import { Education, EDUCATION_OPTIONS } from '../../types/candidate';
 import PageLayout from '../layout/PageLayout';
+import config from '../../config';
 
 const { toast } = createStandaloneToast();
 
@@ -119,7 +120,7 @@ const CandidateForm: React.FC = () => {
       Object.entries(data).forEach(([key, value]) => {
         if (key === 'cv' && data.cv?.[0]) {
           formData.append('cv', data.cv[0]);
-        } else {
+        } else if (value !== undefined && value !== null) {
           formData.append(key, value);
         }
       });
@@ -131,31 +132,23 @@ const CandidateForm: React.FC = () => {
         cv: formData.get('cv'),
       });
 
-      const response = await fetch('http://localhost:3010/api/candidates', {
+      const response = await fetch(`${config.apiUrl}/api/candidates`, {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-        },
         body: formData,
       });
 
-      console.log('Response status:', response.status);
-      const responseText = await response.text();
-      console.log('Response text:', responseText);
-
       if (!response.ok) {
-        let errorMessage = 'Failed to create candidate';
-        try {
-          const errorData = JSON.parse(responseText);
-          errorMessage = errorData.error || errorMessage;
-        } catch (e) {
-          console.error('Error parsing error response:', e);
-        }
-        throw new Error(errorMessage);
+        const errorData = await response.json().catch(() => ({ error: 'Failed to create candidate' }));
+        throw new Error(errorData.error || 'Failed to create candidate');
       }
 
-      const result = JSON.parse(responseText);
+      const result = await response.json();
       console.log('Success:', result);
+      
+      if (result.cvUrl) {
+        result.cvUrl = `${config.apiUrl}${result.cvUrl}`;
+      }
+      
       setAddedCandidate(result);
       
       toast({

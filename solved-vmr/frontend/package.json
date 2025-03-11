@@ -10,9 +10,6 @@
     "@chakra-ui/toast": "^7.0.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^13.5.0",
     "@types/dompurify": "^3.0.5",
     "@types/jest": "^27.5.2",
     "@types/node": "^16.18.97",
@@ -52,10 +49,15 @@
     ]
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@types/react-helmet-async": "^1.0.1",
     "@types/react-router-dom": "^5.3.3",
+    "jest": "^27.5.1",
+    "msw": "^2.7.3",
     "react-helmet-async": "^2.0.5"
   }
 }
