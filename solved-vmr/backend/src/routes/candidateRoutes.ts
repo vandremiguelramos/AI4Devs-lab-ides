@@ -1,9 +1,10 @@
-import express from 'express';
-import { createCandidate, getAllCandidates } from '../controllers/candidateController';
+import { Router } from 'express';
+import { createCandidate, getAllCandidates, getCandidate, uploadMiddleware } from '../controllers/candidateController';
 
-const router = express.Router();
+const router = Router();
 
 router.get('/', getAllCandidates);
-router.post('/', createCandidate);
+router.get('/:id', getCandidate);
+router.post('/', uploadMiddleware, createCandidate);
 
 export default router;

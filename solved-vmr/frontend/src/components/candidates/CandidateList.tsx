@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
@@ -24,9 +24,10 @@ import {
 } from '@chakra-ui/react';
 import { AddIcon, DownloadIcon, ChevronLeftIcon, TriangleUpIcon, TriangleDownIcon } from '@chakra-ui/icons';
 import { useNavigate } from 'react-router-dom';
-import { Candidate } from '../../types/candidate';
+import { Candidate, Education } from '../../types/candidate';
 import ThemeToggle from '../ThemeToggle';
 import PageLayout from '../layout/PageLayout';
+import CandidateFilters from './CandidateFilters';
 
 type SortField = 'name' | 'email' | 'phoneNumber' | 'education' | 'workExperience' | 'createdAt';
 type SortOrder = 'asc' | 'desc';
@@ -36,19 +37,38 @@ interface SortConfig {
   order: SortOrder;
 }
 
+interface FilterOptions {
+  searchTerm: string;
+  education: Education | '';
+  workExperience: string;
+}
+
 const CandidateList: React.FC = () => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'createdAt', order: 'desc' });
+  const [filters, setFilters] = useState<FilterOptions>({
+    searchTerm: '',
+    education: '',
+    workExperience: '',
+  });
   const navigate = useNavigate();
   const toast = useToast();
 
-  const bgColor = useColorModeValue('white', 'gray.800');
+  const bgColor = useColorModeValue('white', 'gray.700');
   const hoverBg = useColorModeValue('blue.50', 'blue.900');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
   const headerBg = useColorModeValue('gray.50', 'gray.700');
   const textColor = useColorModeValue('gray.600', 'gray.300');
   const headingColor = useColorModeValue('gray.800', 'white');
+
+  // Helper function to safely parse work experience
+  const parseWorkExperience = (experience: string | null): number => {
+    if (!experience) return 0;
+    const years = parseInt(experience);
+    return isNaN(years) ? 0 : years;
+  };
 
   useEffect(() => {
     fetchCandidates();
@@ -62,16 +82,10 @@ const CandidateList: React.FC = () => {
       }
       const data = await response.json();
       setCandidates(data);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load candidates',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -147,15 +161,58 @@ const CandidateList: React.FC = () => {
     );
   };
 
-  if (isLoading) {
+  const handleFilterChange = (newFilters: FilterOptions) => {
+    setFilters(newFilters);
+  };
+
+  const handleReset = () => {
+    setFilters({
+      searchTerm: '',
+      education: '',
+      workExperience: '',
+    });
+  };
+
+  const filteredCandidates = candidates.filter((candidate) => {
+    // Search term filter
+    const searchMatch = !filters.searchTerm || 
+      (candidate.firstName || '').toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+      (candidate.lastName || '').toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+      (candidate.email || '').toLowerCase().includes(filters.searchTerm.toLowerCase());
+
+    // Education filter
+    const educationMatch = !filters.education || 
+      candidate.education === filters.education;
+
+    // Work experience filter
+    const years = parseWorkExperience(candidate.workExperience);
+    const workExperienceMatch = !filters.workExperience || 
+      (filters.workExperience === '0-2' && years <= 2) ||
+      (filters.workExperience === '3-5' && years > 2 && years <= 5) ||
+      (filters.workExperience === '5+' && years > 5);
+
+    return searchMatch && educationMatch && workExperienceMatch;
+  });
+
+  if (loading) {
     return (
       <PageLayout>
-        <Box display="flex" justifyContent="center" alignItems="center" height="60vh">
+        <Box display="flex" justifyContent="center" height="60vh">
           <Spinner 
             size="xl" 
             label="Loading candidates"
             aria-label="Loading candidates"
           />
+        </Box>
+      </PageLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageLayout>
+        <Box p={4}>
+          <Text color="red.500">Error: {error}</Text>
         </Box>
       </PageLayout>
     );
@@ -186,7 +243,13 @@ const CandidateList: React.FC = () => {
           </Tooltip>
         </HStack>
         
-        {candidates.length === 0 ? (
+        <CandidateFilters
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onReset={handleReset}
+        />
+
+        {filteredCandidates.length === 0 ? (
           <Box 
             textAlign="center" 
             py={10}
@@ -251,7 +314,7 @@ const CandidateList: React.FC = () => {
                 </Tr>
               </Thead>
               <Tbody>
-                {candidates.map((candidate) => (
+                {filteredCandidates.map((candidate) => (
                   <Tr 
                     key={candidate.id}
                     _hover={{
